@@ -1,0 +1,205 @@
+---
+title: "Solução Lista 06"
+author: |
+        | Nome: Julia Xavier
+        | E-mail: julia.xavier@aluno.ufabc.edu.br
+        | Nome: Leonardo Bernardes Lério
+        | E-mail: leonardo.lerio@aluno.ufabc.edu.br
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = T,
+                      fig.align='center',
+                      cache=TRUE,
+                      out.width = "60%",
+                      out.heigth = "60%",
+                      warning=FALSE,
+                      message=FALSE)
+options(width =70)
+
+library(reticulate)
+use_python("C:/Users/leonler/AppData/Local/Programs/Python/Python39/python.exe")
+```
+
+## Exercício 01
+a) Explique o que é a medida de desempenho revocação (ou recall) e calcule manualmente este valor de
+acordo com os valores apresentados na matriz de confusão dada acima.
+
+RESPOSTA: A medida de desempenho revocação (ou recall) é a proporção de casos positivos corretamente identificados em relação ao total de casos positivos reais. Em outras palavras, é a capacidade do modelo em encontrar todos os casos positivos (verdadeiros positivos) dentre todos os casos que realmente são positivos (verdadeiros positivos + falsos negativos).
+```{python}
+vp = 61
+fn = 3
+
+revocacao = vp / (vp+fn)
+revocacao
+```
+
+b) Explique o que é a medida de desempenho precisão (ou precision) e calcule manualmente este valor de
+acordo com os valores apresentados na matriz de confusão dada acima.
+
+RESPOSTA: A medida de desempenho precisão (ou precision) é a proporção de casos positivos corretamente identificados em relação ao total de casos positivos previstos pelo modelo. Em outras palavras, é a capacidade do modelo de não classificar erroneamente casos negativos como positivos (falsos positivos).
+
+```{python}
+fp = 5
+
+precisao = vp / (vp+fp)
+precisao
+```
+
+c) Calcule manualmente as medidas de desempenho sensibilidade e especificidade usando a matriz de confusão acima.
+
+RESPOSTA: Sensibilidade (ou taxa de verdadeiros positivos) é a proporção de casos positivos corretamente identificados em relação ao total de casos positivos reais. É o mesmo que a revocação calculada na pergunta a).
+
+```{python}
+revocacao
+
+vn=136
+
+especificidade = vn/(vn+fp)
+especificidade
+```
+
+d) Verifique o seu resultado com as funções recall, precision, sensitivity e specificity do pacote
+yardstick.
+
+```{python}
+!pip install matplotlib-venn
+!apt-get -qq install -y libfluidsynth1
+# https://pypi.python.org/pypi/libarchive
+!apt-get -qq install -y libarchive-dev && pip install -U libarchive
+import libarchive
+# https://pypi.python.org/pypi/pydot
+!apt-get -qq install -y graphviz && pip install pydot
+import pydot
+!pip install cartopy
+import cartopy
+from yardstick import recall, precision, sensitivity, specificity
+
+TP = 61
+FP = 5
+TN = 136
+FN = 3
+
+print("Recall (Sensibilidade):", recall(TP, FN))
+print("Precision:", precision(TP, FP))
+print("Sensitivity:", sensitivity(TP, FN))
+print("Specificity:", specificity(TN, FP))
+
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import roc_auc_score, accuracy_score
+from tidymodels import logistic_reg, svm_rbf, grid_max_entropy, metric_set, vfold_cv, tune_grid
+from tidymodels.engine import engine_set
+
+engine_set("kernlab")
+
+rec_logistic = logistic_reg(penalty = tune(), mixture = tune())
+
+rec_svm = svm_rbf(sigma = tune(), cost = tune())
+
+grid_logistic = grid_max_entropy(rec_logistic,
+                                 size = 10
+                                 )
+                                 
+grid_svm = grid_max_entropy(rec_svm,
+                            size = 10
+                            )
+                            
+folds = vfold_cv(bc_df, v = 10)
+
+metrics = metric_set(roc_auc, accuracy)
+
+tune_res_svm = tune_grid(rec_svm, # O modelo
+                         resamples = folds, # Conjuntos de validação cruzada
+                         grid = grid_svm, # Malha de pontos
+                         metrics = metrics # Medidas de desempenho
+                         )
+                         
+print(tune_res_svm)
+
+tune_res_svm_df = tune_res_svm. unnest()
+
+tune_res_logistic_df = tune_res_logistic.unnest()
+
+print(tune_res_svm_df)
+print(tune_res_logistic_df)
+```
+
+## Exercício 04
+```{python}
+import numpy as np
+from sklearn.datasets import load_iris
+from sklearn.model_selection import KFold
+from sklearn.preprocessing import StandardScaler
+```
+
+```{python}
+iris = load_iris()
+X = iris.data
+y = iris.target
+X
+y
+```
+
+```{python}
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+```
+
+```{python}
+#Conversao setosa=1, Outras=0
+y_setosa = np.where(y == 0, 1, 0)
+y_setosa
+```
+
+```{python}
+# Perceptron implementação
+class Perceptron:
+    def __init__(self, learning_rate=0.01, n_epochs=100):
+        self.learning_rate = learning_rate
+        self.n_epochs = n_epochs
+
+    def fit(self, X, y):
+        n_samples, n_features = X.shape
+        self.weights = np.zeros(n_features)
+        self.bias = 0
+
+        for _ in range(self.n_epochs):
+            for xi, target in zip(X, y):
+                linear_output = np.dot(xi, self.weights) + self.bias
+                predicted = self.activation(linear_output)
+                update = self.learning_rate * (target - predicted)
+                self.weights += update * xi
+                self.bias += update
+
+    def activation(self, x):
+        return 1 if x >= 0 else 0
+
+    def predict(self, X):
+        linear_output = np.dot(X, self.weights) + self.bias
+        return np.array([self.activation(x) for x in linear_output])
+
+perceptron = Perceptron(learning_rate=0.01, n_epochs=100)
+```
+
+```{python}
+k = 5
+kf = KFold(n_splits=k, shuffle=True, random_state=42)
+acuracias = []
+
+for train_index, test_index in kf.split(X_scaled):
+    X_train, X_test = X_scaled[train_index], X_scaled[test_index]
+    y_train, y_test = y_setosa[train_index], y_setosa[test_index]
+
+    perceptron.fit(X_train, y_train)
+    y_pred = perceptron.predict(X_test)
+
+    acuracia = np.mean(y_pred == y_test)
+    acuracias.append(acuracia)
+```
+
+```{python}
+print("Acuracia média:", np.mean(acuracias))
+```
